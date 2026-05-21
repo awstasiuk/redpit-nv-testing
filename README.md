@@ -36,7 +36,7 @@ The SPI bit-bang loop runs **on the RP's ARM core** — not on the host — so a
 | Red Pitaya | STEMlab 125-14 (125 MHz internal clock) |
 | Synthesizer | [EV-ADF4355SD1Z](https://www.analog.com/en/resources/evaluation-hardware-and-software/evaluation-boards-kits/EV-ADF4355SD1Z.html) evaluation board |
 | Reference | Onboard 122.88 MHz differential TCXO (Vectron VCC6-LAB-122M880000) |
-| SPI wiring | DIO0\_P = CLK, DIO1\_P = DATA, DIO2\_P = LE |
+| SPI wiring | E2 Pin 3 (DIO0\_P) = DATA, E2 Pin 5 (DIO1\_P) = CLK, E2 Pin 7 (DIO2\_P) = LE |
 | Photodiode | Connected to Red Pitaya IN1 (or IN2) |
 
 The eval board's TCXO gives a PFD of **61.44 MHz** (÷2 after R-counter), which covers the NV sweep range of 2.7–3.0 GHz with the ADF4355 output divider set to ÷2 (VCO at 5.4–6.0 GHz).

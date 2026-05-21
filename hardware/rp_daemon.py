@@ -40,11 +40,22 @@ MAP_SIZE  = 4096
 DIR_P_OFF = 0x10   # P-pin direction register (bit N = 1 → output)
 OUT_P_OFF = 0x18   # P-pin output register
 
-# SPI pin assignments on the E1 expansion connector
-# Default matches ADF4355Config defaults (DIO0_P=CLK, DIO1_P=DATA, DIO2_P=LE).
-PIN_CLK  = 0
-PIN_DATA = 1
-PIN_LE   = 2
+# SPI pin assignments — DIO index into the P-bank (0 = DIO0_P, 1 = DIO1_P, …)
+# Must match ADF4355Config.pin_clk / pin_data / pin_le.
+#
+# Default wiring (E2 expansion connector):
+#   E2 Pin 3  DIO0_P  →  DATA (SPI_MOSI / SDI)
+#   E2 Pin 5  DIO1_P  →  CLK  (SPI_SCK)
+#   E2 Pin 7  DIO2_P  →  LE   (SPI_CS#)
+#   Any GND           →  GND
+#
+# If you rewire, change the three constants below and update ADF4355Config
+# on the host to the same values so they stay in sync.
+# Only P-bank pins (OUT_P_OFF) are driven here; do not assign N-bank pins
+# (E2 even pins 4, 6, 8 …) without adding N-bank register writes.
+PIN_CLK  = 1   # DIO1_P  (E2 Pin 5)
+PIN_DATA = 0   # DIO0_P  (E2 Pin 3)
+PIN_LE   = 2   # DIO2_P  (E2 Pin 7)
 
 BIT_CLK  = 1 << PIN_CLK   # 0x01
 BIT_DATA = 1 << PIN_DATA  # 0x02

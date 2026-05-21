@@ -27,10 +27,20 @@ class ADF4355Config:
     # Output divider — must be a power of 2 in {1, 2, 4, 8, 16, 32, 64}
     rf_div: int = 2            # ÷2 → VCO runs at 2× RF output, covers NV range
 
-    # GPIO pin assignments (Red Pitaya digital I/O)
-    pin_clk: int = 0           # DIO0_P
-    pin_data: int = 1          # DIO1_P
-    pin_le: int = 2            # DIO2_P
+    # GPIO pin assignments — DIO index (0 = DIO0_P, 1 = DIO1_P, …)
+    #
+    # Default wiring matches the E2 expansion connector as follows:
+    #   E2 Pin 3  DIO0_P  →  DATA (SPI_MOSI / SDI)
+    #   E2 Pin 5  DIO1_P  →  CLK  (SPI_SCK)
+    #   E2 Pin 7  DIO2_P  →  LE   (SPI_CS#)
+    #   Any GND           →  GND
+    #
+    # If you rewire, update these three values to the new DIO indices.
+    # Note: the daemon only drives P-bank pins; do not use N-bank pins
+    # (E2 even pins 4, 6, 8 …) without also updating rp_daemon.py.
+    pin_clk: int = 1           # DIO1_P  (E2 Pin 5)
+    pin_data: int = 0          # DIO0_P  (E2 Pin 3)
+    pin_le: int = 2            # DIO2_P  (E2 Pin 7)
 
     # Charge pump and RF output settings
     cp_current: int = 0b0010   # charge pump current code; 0b0010 ≈ 0.94 mA (eval board: 5.1 kΩ RSET, ICP = 0.9 mA)
