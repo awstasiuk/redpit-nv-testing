@@ -5,8 +5,8 @@ These tests require no hardware — only the local modules.
 
 import pytest
 import numpy as np
+from unittest.mock import MagicMock
 from hardware.utils import calc_registers, verify_frequency
-from hardware.adf4355 import ADF4355
 from experiments.odmr import ODMRSweep
 
 
@@ -114,7 +114,7 @@ class TestODMRSweep:
             self.freqs_set = []
             self.last_freq = None
 
-        def set_frequency(self, f_hz, wait_lock=True):
+        def set_frequency(self, f_hz):
             self.freqs_set.append(f_hz)
             self.last_freq = f_hz
 
@@ -138,41 +138,61 @@ class TestODMRSweep:
         # Synth should have received all 5 set calls
         assert len(synth.freqs_set) == 5
 
-    def test_record_counts(self):
-        """Test recording photon counts."""
+    def test_record_signal(self):
+        """Test manually recording a voltage signal at each frequency point."""
         synth = self.MockSynth()
         sweep = ODMRSweep(synth, f_start=2.7e9, f_stop=2.8e9, n_points=3)
 
-        # Iterate and record counts
         for i, freq in enumerate(sweep):
-            sweep.record(100 + i * 10)  # counts: 100, 110, 120
+            sweep.record(0.5 + i * 0.05)  # voltages: 0.50, 0.55, 0.60 V
 
-        freqs, counts = sweep.result()
+        freqs, voltages = sweep.result()
         assert len(freqs) == 3
-        assert len(counts) == 3
-        assert counts[0] == 100
-        assert counts[1] == 110
-        assert counts[2] == 120
+        assert len(voltages) == 3
+        assert voltages[0] == pytest.approx(0.50)
+        assert voltages[1] == pytest.approx(0.55)
+        assert voltages[2] == pytest.approx(0.60)
 
-    def test_run_with_count_fn(self):
-        """Test convenience run() method with a mock counter function."""
+    def test_run_with_read_fn(self):
+        """Test run() with a custom read function (offline / alternative hardware)."""
         synth = self.MockSynth()
         sweep = ODMRSweep(synth, f_start=2.7e9, f_stop=2.8e9, n_points=5)
 
-        # Mock counter that increments
-        counter_values = [50, 100, 75, 90, 120]
-        counter_idx = [0]
+        voltage_values = [0.50, 0.48, 0.45, 0.48, 0.51]
+        read_idx = [0]
 
-        def mock_counter():
-            val = counter_values[counter_idx[0]]
-            counter_idx[0] += 1
+        def mock_reader():
+            val = voltage_values[read_idx[0]]
+            read_idx[0] += 1
             return val
 
-        freqs, counts = sweep.run(mock_counter)
+        freqs, voltages = sweep.run(mock_reader)
 
         assert len(freqs) == 5
-        assert len(counts) == 5
-        assert list(counts) == counter_values
+        assert len(voltages) == 5
+        assert list(voltages) == voltage_values
+
+    def test_run_adc_uses_scope(self):
+        """Test that run() without read_fn drives the Red Pitaya scope."""
+        synth = self.MockSynth()
+
+        # Mock PyRPL: scope.curve() returns (ch1, ch2) arrays at fixed voltage.
+        fake_voltage = 0.42
+        mock_scope = MagicMock()
+        mock_scope.curve.return_value = (
+            np.full(1024, fake_voltage),
+            np.zeros(1024),
+        )
+        mock_rp = MagicMock()
+        mock_rp.rp.scope = mock_scope
+
+        sweep = ODMRSweep(synth, rp=mock_rp, adc_channel=1,
+                          f_start=2.7e9, f_stop=2.8e9, n_points=3)
+        freqs, voltages = sweep.run()
+
+        assert len(voltages) == 3
+        assert voltages == pytest.approx([fake_voltage] * 3)
+        assert mock_scope.curve.call_count == 3
 
     def test_sweep_freq_array(self):
         """Test that sweep frequency array is correctly spaced."""
@@ -219,26 +239,22 @@ class TestIntegration:
             assert meta["error_hz"] < 1.0
 
     def test_sweep_with_calculated_freqs(self):
-        """Test sweep iteration with frequency calculation."""
+        """Test sweep iteration verifies each frequency can be calculated."""
 
-        class SynthWithCalc(
-            ODMRSweep.MockSynth if hasattr(ODMRSweep, "MockSynth") else object
-        ):
+        class SynthWithCalc:
             def __init__(self):
                 self.freqs_set = []
 
             def set_frequency(self, f_hz, wait_lock=True):
-                # Verify frequency can be calculated
                 regs = calc_registers(f_hz)
                 self.freqs_set.append((f_hz, regs))
 
         synth = SynthWithCalc()
         sweep = ODMRSweep(synth, f_start=2.7e9, f_stop=3.0e9, n_points=5)
 
-        for freq in sweep:
+        for _freq in sweep:
             pass
 
-        # All 5 frequencies should have valid register sets
         assert len(synth.freqs_set) == 5
 
 

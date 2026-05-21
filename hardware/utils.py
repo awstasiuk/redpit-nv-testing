@@ -16,10 +16,13 @@ class ADF4355Config:
     """
 
     # Reference input chain
-    f_ref_hz: float = 125e6    # REFIN frequency (Hz) — RP 125 MHz internal clock
-    r: int = 1                 # R counter value
-    rdiv2: int = 1             # 1 = enable ÷2 flip-flop after R counter → fPFD = 62.5 MHz
-    ref_doubler: int = 0       # 1 = enable reference doubler (D bit)
+    # Defaults match the EV-ADF4355SD1Z eval board: onboard 122.88 MHz differential
+    # TCXO (Vectron VCC6-LAB-122M880000) with R=1, RDIV2=1 → fPFD = 61.44 MHz.
+    f_ref_hz: float = 122.88e6  # REFIN frequency (Hz)
+    r: int = 1                  # R counter value
+    rdiv2: int = 1              # 1 = enable ÷2 flip-flop after R counter → fPFD = 61.44 MHz
+    ref_doubler: int = 0        # 1 = enable reference doubler (D bit)
+    ref_mode: int = 1           # 0 = single-ended REFIN, 1 = differential (eval board TCXO)
 
     # Output divider — must be a power of 2 in {1, 2, 4, 8, 16, 32, 64}
     rf_div: int = 2            # ÷2 → VCO runs at 2× RF output, covers NV range
@@ -30,7 +33,7 @@ class ADF4355Config:
     pin_le: int = 2            # DIO2_P
 
     # Charge pump and RF output settings
-    cp_current: int = 0b0111   # charge pump current code; 0b0111 = 2.50 mA
+    cp_current: int = 0b0010   # charge pump current code; 0b0010 ≈ 0.94 mA (eval board: 5.1 kΩ RSET, ICP = 0.9 mA)
     rf_power: int = 0b11       # output power code; 0b11 = +5 dBm
     bleed_value: int = 4       # negative bleed current; tune up if spur floor is high
 
@@ -82,7 +85,7 @@ class ADF4355Config:
         return 16 / (self.f_pfd / self.adc_clk_div)
 
 
-# Default config matching the standard Red Pitaya + NV setup.
+# Default config matching the EV-ADF4355SD1Z eval board with its onboard 122.88 MHz TCXO.
 DEFAULT_CONFIG = ADF4355Config()
 
 
@@ -218,7 +221,8 @@ def calc_registers(f_out_hz: float, config: ADF4355Config = DEFAULT_CONFIG) -> d
     f_out_hz : float
         Desired RF output frequency in Hz (e.g. 2.87e9 for NV zero-field).
     config : ADF4355Config
-        Hardware configuration; defaults to DEFAULT_CONFIG (125 MHz ref, ÷2 out).
+        Hardware configuration; defaults to DEFAULT_CONFIG (EV-ADF4355SD1Z eval board,
+        122.88 MHz differential TCXO, fPFD = 61.44 MHz, ÷2 output divider).
 
     Returns
     -------
@@ -265,7 +269,7 @@ def calc_registers(f_out_hz: float, config: ADF4355Config = DEFAULT_CONFIG) -> d
     reg3 = _build_reg3(phase_val=1, phase_adjust=0, phase_resync=0, sd_load_reset=0)
     reg4 = _build_reg4(
         muxout=0b110,
-        ref_mode=0,
+        ref_mode=config.ref_mode,
         ref_doubler=config.ref_doubler,
         rdiv2=config.rdiv2,
         r_counter=config.r,

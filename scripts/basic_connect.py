@@ -1,11 +1,16 @@
+"""
+Basic connectivity smoke-test.
+
+Opens two independent connections to the Red Pitaya:
+  - RPSynthTransport  (Paramiko SSH + daemon socket) → ADF4355 SPI
+  - pyrpl.Pyrpl                                      → scope / ADC
+"""
+
 import os
 import sys
 
-from pyrpl import Pyrpl
-
 HOSTNAME = os.getenv("REDPITAYA_HOST")
 PASSWORD = os.getenv("REDPITAYA_PASSWORD", "")
-CONFIG = os.getenv("REDPITAYA_CONFIG", "pyrpl_config.yml")
 
 if not HOSTNAME:
     sys.exit(
@@ -14,9 +19,24 @@ if not HOSTNAME:
         "  bash/zsh   : export REDPITAYA_HOST=rp-XXXXXX.local"
     )
 
-p = Pyrpl(hostname=HOSTNAME, password=PASSWORD, gui=False, config=CONFIG)
-r = p.rp
+# --- SPI transport (Paramiko + on-device daemon) --------------------------
+from hardware import ADF4355, RPSynthTransport
 
-print("Connected to Red Pitaya at", HOSTNAME)
-print("Firmware version:", r.firmware_version)
-print("Available modules:", r.modules)
+transport = RPSynthTransport(HOSTNAME, password=PASSWORD)
+transport.connect()
+
+synth = ADF4355(transport)
+synth.init(f_init_hz=2.87e9)
+print("ADF4355 initialised at 2.87 GHz")
+
+transport.close()
+
+# --- Scope / ADC (PyRPL) --------------------------------------------------
+try:
+    from pyrpl import Pyrpl  # type: ignore[import-untyped]
+    rp = Pyrpl(hostname=HOSTNAME, password=PASSWORD, gui=False,
+               config=os.getenv("REDPITAYA_CONFIG", "pyrpl_config.yml"))
+    print("PyRPL connected. Firmware:", rp.rp.firmware_version)
+    rp.close()
+except ImportError:
+    print("pyrpl not installed — skipping scope check.")
